@@ -61,6 +61,7 @@ package msDFS::NamespaceAnchor;
 package msDFS::Linkv2;
 	use strict;
 	use XML::Simple qw(:strict);
+	use Data::Dumper;
 	
 	sub new {
 		my ($class, $ldapobject) = @_;
@@ -148,9 +149,20 @@ use strict;
 use File::Slurp;
 use Data::Dumper;
 use Text::Iconv;
+use FindBin qw($Bin $Script);
 use XML::Simple qw(:strict);
+use Getopt::Long::Descriptive;
 
-my @lines=map { s/[\n\r]*//g; $_; } read_file("ad.ldf"); 
+my ($opt, $usage) = describe_options(
+        '$Script %o <some-arg>',
+        [ 'ldif|l=s',      "Divisor of sleep faktor", { default => 1 } ],
+        [],
+        [ 'help',               "print usage message and exit", { shortcircuit => 1 } ],
+);
+
+print($usage->text), exit if $opt->help;
+
+my @lines=map { s/[\n\r]*//g; $_; } read_file($opt->ldif); 
 
 my @entries;
 my $entry;
