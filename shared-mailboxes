@@ -1,0 +1,53 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+use FindBin qw($Bin $Script);
+use lib "$Bin/lib";
+
+use File::Slurp;
+use Data::Dumper;
+use Text::Iconv;
+use XML::Simple qw(:strict);
+use Getopt::Long::Descriptive;
+
+use ADLDIF::LDAP::Object;
+use ADLDIF::Person;
+
+my ($opt, $usage) = describe_options(
+	'$Script %o <some-arg>',
+	[ 'ldif|l=s',	"Input LDIF file", { required => 1 } ],
+	[],
+	[ 'help',	"print usage message and exit", { shortcircuit => 1 } ],
+);
+
+print($usage->text), exit if $opt->help;
+
+my @lines=map { s/[\n\r]*//g; $_; } read_file($opt->ldif); 
+
+my @objlines;
+my @persons;
+foreach ( @lines ) {
+	push @objlines, $_;
+	if (/^$/) {
+		my $lo=new ADLDIF::LDAP::Object(\@objlines);
+		@objlines=();
+		if ($lo->objectClass_contains("person")) {
+			push @persons, new ADLDIF::Person($lo);
+		}
+	}
+}
+
+foreach my $person ( @persons ) {
+	my $delegated=$person->{lo}->attribute("msExchDelegateListLink");
+	next if (!defined($delegated));
+
+ 	printf("%s;%s;;\n", 
+ 		$person->{lo}->attribute_value_first("cn") // "",
+ 		$person->{lo}->attribute_value_first("dn") // "");
+ 
+ 	foreach my $delegate ( @{$delegated} ) {
+ 		printf(";;%s;\n", $delegate->value());
+ 	}
+}
+

@@ -1,202 +1,54 @@
 #!/usr/bin/perl -w
-
-package LDAPobject;
-	use strict;
-	use MIME::Base64;
-	use List::Util qw/any/;
-	
-	sub new {
-		my ($class, $entry) = @_;
-
-		my $self={
-			entry => $entry
-		};
-
-		bless $self, $class;
-
-		return $self;
-	}
-	sub objectClass_contains {
-		my ($self, $oc) = @_;
-		return any { $_ eq $oc } @{$self->{entry}{"objectClass"}};
-	}
-
-	sub get_entry {
-		my ($self, $key) = @_;
-		return $self->{entry}{$key};
-	}
-
-	sub get_entry_base64 {
-		my ($self, $key) = @_;
-
-		my $value=$self->{entry}{$key};
-		if (!defined($value)) {
-			return undef;
-		}
-		my $string=join("", @{$value});
-		$string=~ s|\\|/|g;
-
-		return decode_base64($string);
-	}
-1;
-
-package msDFS::NamespaceAnchor;
-	use strict;
-	use XML::Simple qw(:strict);
-	
-	sub new {
-		my ($class, $ldapobject) = @_;
-
-		my $self={
-			lo => $ldapobject
-		};
-
-		bless $self, $class;
-
-		return $self;
-	}
-1;
-
-
-package msDFS::Linkv2;
-	use strict;
-	use XML::Simple qw(:strict);
-	use Data::Dumper;
-	
-	sub new {
-		my ($class, $ldapobject) = @_;
-
-		my $self={
-			lo => $ldapobject
-		};
-
-		bless $self, $class;
-
-		return $self;
-	}
-
-	sub path {
-		my ($self) = @_;
-		my $path=$self->{lo}->get_entry("msDFS-LinkPathv2");
-
-		if (!defined($path)) {
-			printf("No path in Linkv2\n");
-			print Dumper($self);
-			print Dumper($self->{lo});
-			return undef;
-		}
-		return $path->[0];
-	}
-
-	sub namespaceid {
-		my ($self) = @_;
-		return $self->{lo}->get_entry("msDFS-NamespaceIdentityGUIDv2")->[0];
-	}
-
-
-	sub targets {
-		my ($self) = @_;
-		my $lo=$self->{lo};
-
-		my $xml=$lo->get_entry_base64("msDFS-TargetListv2");
-		my $link=$lo->get_entry("msDFS-LinkPathv2");
-
-		my $data=XMLin($xml, KeyAttr => { targets => "targets" }, ForceArray => [ "targets", "target" ]);
-	
-		return $data->{target};
-	}
-1;
-
-package msDFS::Namespacev2;
-	use strict;
-	
-	sub new {
-		my ($class, $ldapobject) = @_;
-
-		my $self={
-			lo => $ldapobject
-		};
-
-		bless $self, $class;
-
-		return $self;
-	}
-
-	sub name {
-		my ($self) = @_;
-		return $self->{lo}->get_entry("name")->[0];
-	}
-
-	sub id {
-		my ($self) = @_;
-		return $self->{lo}->get_entry("msDFS-NamespaceIdentityGUIDv2")->[0];
-	}
-
-	sub targets {
-		my ($self) = @_;
-		my $lo=$self->{lo};
-
-		my $xml=$lo->get_entry_base64("msDFS-TargetListv2");
-		my $link=$lo->get_entry("msDFS-LinkPathv2");
-
-		my $data=XMLin($xml, KeyAttr => { targets => "targets" }, ForceArray => [ "targets" ]);
-	
-		return $data->{target};
-	}
-1;
-
 use strict;
+
+use FindBin qw($Bin $Script);
+use lib "$Bin/lib";
+
 use File::Slurp;
 use Data::Dumper;
 use Text::Iconv;
-use FindBin qw($Bin $Script);
-use XML::Simple qw(:strict);
 use Getopt::Long::Descriptive;
 
+use ADLDIF::LDAP::Object;
+use ADLDIF::msDFS::NamespaceAnchor;
+use ADLDIF::msDFS::Namespacev2;
+use ADLDIF::msDFS::Linkv2;
+
 my ($opt, $usage) = describe_options(
-        '$Script %o <some-arg>',
-        [ 'ldif|l=s',      "Divisor of sleep faktor", { default => 1 } ],
-        [],
-        [ 'help',               "print usage message and exit", { shortcircuit => 1 } ],
+	'$Script %o <some-arg>',
+	[ 'ldif|l=s',	"Input LDIF file", { required => 1 } ],
+	[],
+	[ 'help',	"print usage message and exit", { shortcircuit => 1 } ],
 );
 
 print($usage->text), exit if $opt->help;
 
 my @lines=map { s/[\n\r]*//g; $_; } read_file($opt->ldif); 
 
-my @entries;
-my $entry;
-my $k;
-foreach ( @lines ) {
-	if (/^([^:]+):+\s*(\S*)/) {
-		$k=$1;
-		if ($2 ne '') {
-			push @{$entry->{$k}}, $2;
-		}
-	} elsif (/^\s+(\S+)$/) {
-		push @{$entry->{$k}}, $1;
-	} elsif (/^$/) {
-		push @entries, new LDAPobject($entry);
-		$entry={};
-		$k="";
-	}
-}
-
 my $namespaceindex;
 
 my @links;
 my @namespaces;
 my @anchors;
-foreach my $entry ( @entries ) {
-	if ($entry->objectClass_contains("msDFS-Linkv2")) {
-		push @links, new msDFS::Linkv2($entry);
-	} elsif ($entry->objectClass_contains("msDFS-Namespacev2")) {
-		my $ns=new msDFS::Namespacev2($entry);
-		push @namespaces, $ns;
+
+my @objlines;
+foreach ( @lines ) {
+	push @objlines, $_;
+	if (!/^$/) {
+		next;
+	}
+
+	my $lo=new ADLDIF::LDAP::Object(\@objlines);
+	@objlines=();
+
+	if ($lo->objectClass_contains("msDFS-Linkv2")) {
+		push @links, new ADLDIF::msDFS::Linkv2($lo);
+	} elsif ($lo->objectClass_contains("msDFS-Namespacev2")) {
+		my $ns=new ADLDIF::msDFS::Namespacev2($lo);
 		my $id=$ns->id();
 		$namespaceindex->{$id}=$ns;
-	} elsif ($entry->objectClass_contains("msDFS-NamespaceAnchor")) {
-		push @anchors, new msDFS::NamespaceAnchor($entry);
+	} elsif ($lo->objectClass_contains("msDFS-NamespaceAnchor")) {
+		push @anchors, new ADLDIF::msDFS::NamespaceAnchor($lo);
 	}
 }
 

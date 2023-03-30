@@ -43,3 +43,18 @@ Extract DFS Namespace and Targets
 	DEHR;/HR;0;siteCostNormal;\\SVFS12\DEHR;
 	DEHR;/HR;0;siteCostNormal;\\SVFS1\DEHR;
 
+Extract shared mailboxes access
+===============================
+
+	./shared-mailboxes -l adds/ad.ldf
+	Boss, Big;CN=Boss\, Big,OU=User,OU=Elite,DC=domain,DC=de;;
+	;;CN=Secretary\, My,OU=Organisation,DC=Domain,DC=de;
+	[ ... ]
+
+Extract mailbox quota
+=====================
+
+	./mailquota -l adds/ad.ldif
+	samaccountname;dn;company;msExchArchiveQuota;msExchArchiveWarnQuota;msExchDumpsterQuota;msExchDumpsterWarningQuota;Addresses
+	Boss, Big,CN=Boss\, Big,DC=domain,DC=de;;104857600;94371840;31457280;20971520;,,,,,,,,,,,,,,,,,,,,,,,,,,
+
