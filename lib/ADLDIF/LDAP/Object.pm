@@ -55,6 +55,20 @@ package ADLDIF::LDAP::Object;
 
 		return defined($e) ? $e->[0] : undef;
 	}
+
+	# This is Microsoft. They fucked up the RFC Standard beyond
+	# repair. They mixed byte order as they whished.
+	sub _decodeGUID($self, $binguid) {
+		my @a=unpack("VvvnNn",$binguid);
+		return sprintf("%08X-%04X-%04X-%04x-%08X%04X\n",
+			$a[0], $a[1], $a[2], $a[3], $a[4], $a[5]);
+	}
+
+	sub objectGUID {
+		my ($self) = @_;
+		my $value=$self->attribute_value_first("objectGUID");
+		return $self->_decodeGUID($value);
+	}
 1;
 
 
