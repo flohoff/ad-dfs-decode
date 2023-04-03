@@ -60,7 +60,7 @@ package ADLDIF::LDAP::Object;
 	# repair. They mixed byte order as they whished.
 	sub _decodeGUID($self, $binguid) {
 		my @a=unpack("VvvnNn",$binguid);
-		return sprintf("%08X-%04X-%04X-%04x-%08X%04X\n",
+		return sprintf("%08X-%04X-%04X-%04x-%08X%04X",
 			$a[0], $a[1], $a[2], $a[3], $a[4], $a[5]);
 	}
 
