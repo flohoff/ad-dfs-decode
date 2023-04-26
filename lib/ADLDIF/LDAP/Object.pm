@@ -69,6 +69,23 @@ package ADLDIF::LDAP::Object;
 		my $value=$self->attribute_value_first("objectGUID");
 		return $self->_decodeGUID($value);
 	}
+
+	sub _decodeSID {
+		my ($self, $sidbin) = @_;
+
+		my($sid_rev, $num_auths, $id1, $id2, @ids) =
+			unpack("H2 H2 n N V*", $sidbin);
+		return join("-", "S", $sid_rev, ($id1<<32)+$id2, @ids);
+	}
+
+	sub objectSID {
+		my ($self) = @_;
+		my $value=$self->attribute_value_first("objectSid");
+		if (!defined($value)) {
+			return undef;
+		}
+		return $self->_decodeSID($value);
+	}
 1;
 
 

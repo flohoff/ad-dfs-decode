@@ -1,0 +1,47 @@
+#!/usr/bin/perl -w
+
+use strict;
+use utf8;
+
+use FindBin qw($Bin $Script);
+use lib "$Bin/lib";
+use open IO => ":encoding(utf-8)";
+use open ':std';
+
+use File::Slurp;
+use Data::Dumper;
+use Text::Iconv;
+use XML::Simple qw(:strict);
+use Getopt::Long::Descriptive;
+use Encode;
+
+use ADLDIF::LDAP::Object;
+use ADLDIF::Person;
+
+my ($opt, $usage) = describe_options(
+	'$Script %o <some-arg>',
+	[ 'ldif|l=s',	"Input LDIF file", { required => 1 } ],
+	[],
+	[ 'help',	"print usage message and exit", { shortcircuit => 1 } ],
+);
+
+print($usage->text), exit if $opt->help;
+
+my @lines=map { s/[\n\r]*//g; $_; } read_file($opt->ldif); 
+
+my @objlines;
+foreach ( @lines ) {
+	push @objlines, $_;
+	if (/^$/) {
+		my $lo=new ADLDIF::LDAP::Object(\@objlines);
+		@objlines=();
+
+		my $sid=$lo->objectSID();
+		if (!defined($sid)) {
+			next;
+		}
+
+		#printf("%s;%s\n", $lo->objectSID(), decode('UTF-8', $lo->attribute_first("dn")->value()));
+		printf("%s;%s\n", $lo->objectSID(), $lo->attribute_first("dn")->value());
+	}
+}

@@ -58,3 +58,9 @@ Extract mailbox quota
 	samaccountname;dn;company;msExchArchiveQuota;msExchArchiveWarnQuota;msExchDumpsterQuota;msExchDumpsterWarningQuota;Addresses
 	Boss, Big,CN=Boss\, Big,DC=domain,DC=de;;104857600;94371840;31457280;20971520;,,,,,,,,,,,,,,,,,,,,,,,,,,
 
+Extract DN SID pairs
+====================
+
+	./dnsid -l adds/ad.ldif \
+		| sort -t- -n -k 2 -k 3 -k 4 -k 5 -k 6 -k 7 -k 8 \
+		>dnsid.csv
